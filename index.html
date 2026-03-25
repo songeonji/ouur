@@ -810,7 +810,7 @@ async function submitMyInput() {
 function startWatcher() {
   stopWatcher();
   roomRef = db.ref(`rooms/${currentRoomCode}`);
-  roomCb = roomRef.on('value', snap => {
+  roomCb = roomRef.on('value', async snap => {
     const room = snap.val();
     if (!room) return;
 
