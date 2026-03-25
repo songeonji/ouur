@@ -620,7 +620,6 @@ function show(id) {
         document.getElementById('profile-photo-wrap').innerHTML = `<img src="${currentUser.photoURL}" style="width:100%;height:100%;object-fit:cover"/>`;
       }
     }
-    const k = getApiKey(); if (k) document.getElementById('settings-api-key').value = k;
   }
 }
 
@@ -652,7 +651,6 @@ function genCode() {
 // ── CREATE ─────────────────────────────────────────────────────
 function startCreate(type) {
   if (!FB_READY) { show('screen-firebase'); return; }
-  if (!getApiKey()) { show('screen-setup'); return; }
   currentRoomType = type;
   if (type === 'decision') {
     document.getElementById('create-title').textContent = '결정하기';
@@ -700,7 +698,6 @@ async function createRoom() {
 // ── JOIN ───────────────────────────────────────────────────────
 async function joinRoom() {
   if (!FB_READY) { show('screen-firebase'); return; }
-  if (!getApiKey()) { show('screen-setup'); return; }
   const code = document.getElementById('join-code-input').value.trim().toUpperCase();
   if (code.length !== 6) { toast('6자리 코드를 입력해주세요'); return; }
   try {
