@@ -685,6 +685,14 @@ async function createRoom() {
   } else {
     topic = document.getElementById('mediate-topic-input').value.trim() || '중재';
   }
+  // 입력 필드 초기화
+  document.getElementById('topic-input').value = '';
+  document.getElementById('mediate-topic-input').value = '';
+  document.getElementById('want-input').value = '';
+  document.getElementById('notwant-input').value = '';
+  document.getElementById('med-situation').value = '';
+  document.getElementById('med-feeling').value = '';
+  document.getElementById('med-want').value = '';
 
   const code = genCode();
   try {
@@ -720,7 +728,9 @@ async function joinRoom() {
     currentRoomCode = code;
     currentRoomType = room.type;
     currentRoomTopic = room.topic;
-    myRole = 'B';
+    // 이미 참여한 룸이면 기존 role 유지, 신규면 B
+    const existingUser = users[myUID];
+    myRole = existingUser ? existingUser.role : 'B';
     processingClaimed = false;
     document.getElementById('join-code-input').value = '';
     setLobby(code, room.topic, true);
@@ -743,6 +753,9 @@ function setLobby(code, topic, isJoiner) {
 
 // ── INPUT ──────────────────────────────────────────────────────
 function goToInput() {
+  // 버튼 상태 초기화
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = false; btn.textContent = '완료 — 상대방 기다리기 ✓';
   if (currentRoomType === 'decision') {
     document.getElementById('input-screen-title').textContent = '내 의견';
     document.getElementById('input-decision-fields').style.display = '';
@@ -818,6 +831,7 @@ function startWatcher() {
     // Result ready
     if (room.status === 'done' && room.result) {
       stopWatcher();
+      await completeHistory(currentRoomCode, room.result, currentRoomType);
       renderResult(room.result);
     }
   });
@@ -877,6 +891,7 @@ async function runAI() {
       ? { emoji:'🍲', result:'부대찌개', reason:'둘 다 좋아할 것 같은 안전한 선택이에요!', alternatives:[{emoji:'🥗',name:'샐러드'},{emoji:'🍕',name:'피자'}] }
       : { summary_A:'억울한 마음이 충분히 이해돼요.', summary_B:'상대방도 나름의 사정이 있을 수 있어요.', suggestion:'"나 이 부분이 좀 힘들었어" 라고 편하게 시작해보세요. 비난 없이 내 감정을 먼저 꺼내는 게 포인트예요.' };
     try { await db.ref(`rooms/${currentRoomCode}`).update({ status: 'done', result: fallback }); } catch(_) {}
+    await completeHistory(currentRoomCode, fallback, currentRoomType);
     renderResult(fallback);
   }
 }
