@@ -709,7 +709,7 @@ async function createRoom() {
     processingClaimed = false;
     setLobby(code, topic);
     show('screen-lobby');
-  } catch(e) { toast('룸 생성 실패: ' + e.message); }
+  } catch(e) { toast('룸 생성에 실패했어요. 네트워크를 확인해주세요.'); }
 }
 
 // ── JOIN ───────────────────────────────────────────────────────
@@ -735,7 +735,7 @@ async function joinRoom() {
     document.getElementById('join-code-input').value = '';
     setLobby(code, room.topic, true);
     show('screen-lobby');
-  } catch(e) { toast('입장 실패: ' + e.message); }
+  } catch(e) { toast('입장에 실패했어요. 코드를 다시 확인해주세요.'); }
 }
 
 function setLobby(code, topic, isJoiner) {
@@ -801,7 +801,7 @@ async function submitMyInput() {
       startWatcher();
     }
   } catch(e) {
-    toast('저장 실패: ' + e.message);
+    toast('저장에 실패했어요. 네트워크를 확인하고 다시 시도해주세요.');
     btn.disabled = false; btn.textContent = '완료 — 상대방 기다리기 ✓';
   }
 }
@@ -886,7 +886,11 @@ async function runAI() {
   } catch(e) {
     clearInterval(ticker);
     console.error('AI 오류:', e);
-    toast('AI 오류: ' + e.message);
+    const errMsg = e.message.includes('401') ? '❌ API 키가 올바르지 않아요.'
+      : e.message.includes('429') ? '⏳ 요청이 너무 많아요. 잠시 후 다시 시도해주세요.'
+      : e.message.includes('500') ? '🔧 AI 서버 오류예요. 잠시 후 다시 시도해주세요.'
+      : '⚠️ AI 분석에 실패했어요. 기본 결과를 보여드릴게요.';
+    toast(errMsg);
     const fallback = currentRoomType === 'decision'
       ? { emoji:'🍲', result:'부대찌개', reason:'둘 다 좋아할 것 같은 안전한 선택이에요!', alternatives:[{emoji:'🥗',name:'샐러드'},{emoji:'🍕',name:'피자'}] }
       : { summary_A:'억울한 마음이 충분히 이해돼요.', summary_B:'상대방도 나름의 사정이 있을 수 있어요.', suggestion:'"나 이 부분이 좀 힘들었어" 라고 편하게 시작해보세요. 비난 없이 내 감정을 먼저 꺼내는 게 포인트예요.' };
@@ -1016,6 +1020,14 @@ function toast(msg) {
   setTimeout(() => el.classList.remove('show'), 2400);
 }
 
+// ── GLOBAL ERROR HANDLER ───────────────────────────────────────
+window.addEventListener('unhandledrejection', e => {
+  console.error('Unhandled error:', e.reason);
+  if (e.reason?.message?.includes('Permission denied')) {
+    toast('🔒 접근 권한이 없어요. 로그인 상태를 확인해주세요.');
+  }
+});
+
 // ── INIT ───────────────────────────────────────────────────────
 (function init() {
   if (!FB_READY) { show('screen-firebase'); return; }
@@ -1023,9 +1035,9 @@ function toast(msg) {
     if (user) {
       myUID = user.uid;
       currentUser = user;
-      await loadApiKey();
+      try { await loadApiKey(); } catch(e) { toast('⚠️ AI 설정을 불러오지 못했어요. 잠시 후 다시 시도해주세요.'); }
       show('screen-home');
-      renderHomeHistory();
+      renderHomeHistory().catch(() => {});
     } else {
       myUID = null;
       currentUser = null;
