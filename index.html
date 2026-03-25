@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -171,6 +172,11 @@ html,body{height:100%;background:var(--surface2)}
 .profile-name{font-size:17px;font-weight:600;color:var(--text1)}
 .profile-sub{font-size:12px;color:var(--text2);margin-top:3px;word-break:break-all}
 
+/* google button */
+.btn-google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px 20px;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);font-size:15px;font-weight:600;color:var(--text1);cursor:pointer;font-family:var(--font);transition:background .15s}
+.btn-google:active{background:var(--surface2)}
+.btn-google svg{flex-shrink:0}
+
 /* toast */
 .toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:rgba(28,28,30,.88);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;white-space:nowrap;opacity:0;transition:all .3s;pointer-events:none;z-index:100;max-width:350px;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -179,7 +185,22 @@ html,body{height:100%;background:var(--surface2)}
 <body>
 <div id="app">
 
-<!-- ① FIREBASE 미설정 안내 -->
+<!-- ① 로그인 -->
+<div class="screen" id="screen-login">
+  <div class="setup-wrap">
+    <div class="setup-icon">🤝</div>
+    <div class="setup-title">Ouur에 오신 것을<br>환영해요</div>
+    <div class="setup-sub">둘이 함께 결정하고, 갈등도 해결해요.<br>Google 계정으로 간편하게 시작해요.</div>
+    <div style="width:100%">
+      <button class="btn-google" onclick="signInWithGoogle()">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Google로 시작하기
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ② FIREBASE 미설정 안내 -->
 <div class="screen" id="screen-firebase">
   <div class="top-bar"><span class="logo">ouur</span></div>
   <div class="scroll-area" style="padding:0 0 24px">
@@ -532,10 +553,10 @@ html,body{height:100%;background:var(--surface2)}
   </div>
   <div class="scroll-area" style="padding-top:8px">
     <div class="profile-row">
-      <div class="profile-avatar">🙂</div>
-      <div>
-        <div class="profile-name">나</div>
-        <div class="profile-sub" id="uid-display">—</div>
+      <div id="profile-photo-wrap" style="width:54px;height:54px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:26px">🙂</div>
+      <div style="flex:1;min-width:0">
+        <div class="profile-name" id="profile-name">사용자</div>
+        <div class="profile-sub" id="profile-email">—</div>
       </div>
     </div>
     <div class="section-header">API 설정</div>
@@ -548,7 +569,8 @@ html,body{height:100%;background:var(--surface2)}
     </div>
     <div class="section-header">데이터</div>
     <div style="margin:0 20px 20px">
-      <button class="btn-secondary" onclick="clearHistory()">기록 전체 삭제</button>
+      <button class="btn-secondary" onclick="clearHistory()" style="margin-bottom:10px">기록 전체 삭제</button>
+      <button class="btn-secondary" onclick="signOutUser()" style="color:#FF3B30;border-color:#FF3B30">로그아웃</button>
     </div>
   </div>
 </div>
@@ -570,20 +592,18 @@ const FIREBASE_CONFIG = {
 };
 
 const FB_READY = !FIREBASE_CONFIG.apiKey.startsWith('REPLACE');
-let db = null;
+let db = null, auth = null;
 if (FB_READY) {
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.database();
+    auth = firebase.auth();
   } catch(e) { console.error('Firebase init failed', e); }
 }
 
 // ── STATE ──────────────────────────────────────────────────────
-const myUID = (() => {
-  let uid = localStorage.getItem('ouur_uid');
-  if (!uid) { uid = 'u' + Date.now().toString(36) + Math.random().toString(36).substr(2,4); localStorage.setItem('ouur_uid', uid); }
-  return uid;
-})();
+let myUID = null;
+let currentUser = null;
 
 let currentRoomCode = null;
 let currentRoomType = 'decision';
@@ -609,7 +629,13 @@ function show(id) {
   if (id === 'screen-history') renderHistory();
   if (id === 'screen-home') renderHomeHistory();
   if (id === 'screen-settings') {
-    document.getElementById('uid-display').textContent = myUID;
+    if (currentUser) {
+      document.getElementById('profile-name').textContent = currentUser.displayName || '사용자';
+      document.getElementById('profile-email').textContent = currentUser.email || '';
+      if (currentUser.photoURL) {
+        document.getElementById('profile-photo-wrap').innerHTML = `<img src="${currentUser.photoURL}" style="width:100%;height:100%;object-fit:cover"/>`;
+      }
+    }
     const k = getApiKey(); if (k) document.getElementById('settings-api-key').value = k;
   }
 }
@@ -620,6 +646,16 @@ function selectChip(el, group) {
   el.classList.add('selected');
   if (group === 'mood') selectedMood = el.textContent.trim();
   if (group === 'cat') selectedCategory = el.textContent.trim();
+}
+
+// ── GOOGLE AUTH ────────────────────────────────────────────────
+function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e => toast('로그인 실패: ' + e.message));
+}
+function signOutUser() {
+  if (!confirm('로그아웃 할까요?')) return;
+  auth.signOut();
 }
 
 // ── API KEY ────────────────────────────────────────────────────
@@ -966,8 +1002,18 @@ function toast(msg) {
 // ── INIT ───────────────────────────────────────────────────────
 (function init() {
   if (!FB_READY) { show('screen-firebase'); return; }
-  if (!getApiKey()) { show('screen-setup'); return; }
-  show('screen-home'); renderHomeHistory();
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      myUID = user.uid;
+      currentUser = user;
+      if (!getApiKey()) show('screen-setup');
+      else { show('screen-home'); renderHomeHistory(); }
+    } else {
+      myUID = null;
+      currentUser = null;
+      show('screen-login');
+    }
+  });
 })();
 </script>
 </body>
