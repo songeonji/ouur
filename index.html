@@ -596,8 +596,17 @@ let roomCb = null;
 let processingClaimed = false;
 
 // ── STORAGE ────────────────────────────────────────────────────
-const getHistory = () => JSON.parse(localStorage.getItem('ouur_history') || '[]');
-const saveHistory = h => localStorage.setItem('ouur_history', JSON.stringify(h));
+async function getHistory() {
+  if (!myUID) return [];
+  const snap = await db.ref(`users/${myUID}/history`).get();
+  return snap.val() ? Object.values(snap.val()).sort((a,b) => b.id - a.id) : [];
+}
+async function saveHistory(h) {
+  if (!myUID) return;
+  const obj = {};
+  h.forEach(item => { obj[item.id] = item; });
+  await db.ref(`users/${myUID}/history`).set(obj);
+}
 const getApiKey = () => cachedApiKey || '';
 async function loadApiKey() {
   const snap = await db.ref('config/apiKey').get();
@@ -919,14 +928,14 @@ function leaveRoom() { stopWatcher(); currentRoomCode = null; show('screen-home'
 function finishSession() { stopWatcher(); currentRoomCode = null; show('screen-home'); renderHomeHistory(); }
 
 // ── HISTORY ────────────────────────────────────────────────────
-function addToHistory(type, title, result) {
-  const h = getHistory();
+async function addToHistory(type, title, result) {
+  const h = await getHistory();
   h.unshift({ id:Date.now(), type, title, result: type==='decision' ? result.result : '중재 완료', emoji: type==='decision' ? result.emoji : '🕊', date: new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric'}) });
-  saveHistory(h);
+  await saveHistory(h);
 }
 
-function renderHomeHistory() {
-  const h = getHistory().slice(0,3);
+async function renderHomeHistory() {
+  const h = (await getHistory()).slice(0,3);
   const el = document.getElementById('home-history-list');
   if (!h.length) { el.innerHTML = '<div style="padding:16px 20px 8px;text-align:center;color:var(--text3);font-size:14px">아직 기록이 없어요</div>'; return; }
   el.innerHTML = h.map(item => `
@@ -937,8 +946,8 @@ function renderHomeHistory() {
     </div>`).join('');
 }
 
-function renderHistory() {
-  const h = getHistory();
+async function renderHistory() {
+  const h = await getHistory();
   document.getElementById('stat-dec').textContent = h.filter(x=>x.type==='decision').length;
   document.getElementById('stat-med').textContent = h.filter(x=>x.type==='mediation').length;
   const el = document.getElementById('history-list');
@@ -951,9 +960,10 @@ function renderHistory() {
     </div>`).join('');
 }
 
-function clearHistory() {
+async function clearHistory() {
   if (!confirm('모든 기록을 삭제할까요?')) return;
-  saveHistory([]); renderHistory(); renderHomeHistory(); toast('기록이 삭제됐어요');
+  await db.ref(`users/${myUID}/history`).remove();
+  renderHistory(); renderHomeHistory(); toast('기록이 삭제됐어요');
 }
 
 // ── COPY CODE ──────────────────────────────────────────────────
