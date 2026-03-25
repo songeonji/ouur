@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Ouur — 우리, 오늘도 결정 못 했지?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --primary:#FF6B47;--primary-light:#FFF0EC;--primary-mid:#FFB8A0;
+  --bg:#FAFAF5;--surface:#FFFFFF;--surface2:#F2F2F0;
+  --text1:#1C1C1E;--text2:#6C6C70;--text3:#AEAEB2;
+  --border:#E5E5EA;--border2:#F2F2F0;
+  --blue:#4A90E2;--blue-bg:#E8F2FC;
+  --green:#34C759;--green-bg:#EAF7EE;
+  --orange:#FF9500;--orange-bg:#FFF3E0;
+  --r-sm:8px;--r-md:12px;--r-lg:16px;--r-xl:20px;--r-2xl:24px;
+  --font:'Noto Sans KR','Apple SD Gothic Neo',-apple-system,sans-serif;
+}
+html,body{height:100%;background:var(--surface2)}
+#app{font-family:var(--font);max-width:390px;min-height:100dvh;margin:0 auto;background:var(--bg);position:relative;overflow:hidden;display:flex;flex-direction:column}
+.screen{display:none;flex-direction:column;min-height:100dvh}
+.screen.active{display:flex}
+.scroll-area{flex:1;overflow-y:auto;padding-bottom:8px}
+
+/* top bar */
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;background:var(--bg);position:sticky;top:0;z-index:10}
+.logo{font-size:22px;font-weight:700;color:var(--primary);letter-spacing:-0.5px}
+.back-btn{background:none;border:none;cursor:pointer;font-size:22px;color:var(--text2);padding:4px;line-height:1}
+.screen-title{font-size:17px;font-weight:600;color:var(--text1)}
+.top-action{background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:var(--primary);font-family:var(--font)}
+
+/* bottom nav */
+.bottom-nav{display:flex;border-top:0.5px solid var(--border2);padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:var(--bg);flex-shrink:0}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;background:none;border:none;color:var(--text3);font-family:var(--font);font-size:11px;padding:4px 0}
+.nav-item.active{color:var(--primary);font-weight:600}
+.nav-icon{font-size:20px;line-height:1}
+
+/* section */
+.section-header{padding:16px 20px 8px;font-size:13px;font-weight:600;color:var(--text2)}
+.card{background:var(--surface);border-radius:var(--r-lg);padding:16px;margin:0 20px 10px}
+.card-shadow{box-shadow:0 2px 12px rgba(0,0,0,.06)}
+
+/* buttons */
+.btn-primary{background:var(--primary);color:#fff;border:none;border-radius:var(--r-md);padding:15px 20px;font-size:15px;font-weight:600;cursor:pointer;width:100%;font-family:var(--font);transition:opacity .15s;letter-spacing:-0.2px}
+.btn-primary:active{opacity:.88}
+.btn-primary:disabled{opacity:.45;cursor:default}
+.btn-secondary{background:var(--surface);color:var(--text1);border:0.5px solid var(--border);border-radius:var(--r-md);padding:15px 20px;font-size:15px;font-weight:500;cursor:pointer;width:100%;font-family:var(--font);transition:background .15s}
+.btn-secondary:active{background:var(--surface2)}
+.btn-row{display:flex;gap:10px;padding:0 20px 16px}
+.btn-row .btn-primary,.btn-row .btn-secondary{flex:1}
+
+/* inputs */
+.input-group{margin:0 20px 14px}
+.input-label{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:7px}
+.input-field{width:100%;padding:12px 14px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface);font-size:15px;font-family:var(--font);color:var(--text1);resize:none;outline:none;transition:border-color .2s;-webkit-appearance:none}
+.input-field:focus{border-color:var(--primary)}
+.input-field::placeholder{color:var(--text3)}
+
+/* chips */
+.chip-row{display:flex;flex-wrap:wrap;gap:8px;margin:0 20px 14px}
+.chip{padding:8px 14px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-family:var(--font);color:var(--text1);transition:all .15s;-webkit-appearance:none}
+.chip.selected{background:var(--primary-light);border-color:var(--primary);color:var(--primary);font-weight:600}
+
+/* loading */
+.loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:20px;padding:20px}
+.loading-icon-wrap{width:80px;height:80px;background:var(--primary-light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px}
+.loading-dots{display:flex;gap:7px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--primary);animation:bounce 1.1s infinite}
+.dot:nth-child(2){animation-delay:.18s}.dot:nth-child(3){animation-delay:.36s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0);opacity:.6}40%{transform:translateY(-10px);opacity:1}}
+.loading-title{font-size:18px;font-weight:600;color:var(--text1)}
+.loading-sub{font-size:13px;color:var(--text2);text-align:center;line-height:1.6}
+
+/* result */
+.result-main{margin:4px 20px 14px;background:var(--primary);border-radius:var(--r-2xl);padding:22px 20px}
+.result-row{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.result-emoji{font-size:52px;line-height:1;flex-shrink:0}
+.result-name{font-size:26px;font-weight:700;color:#fff;margin-bottom:4px}
+.result-rank{font-size:13px;color:rgba(255,255,255,.75)}
+.result-reason{font-size:14px;color:rgba(255,255,255,.9);line-height:1.55}
+.result-notice{margin:12px 0 0;font-size:12px;color:rgba(255,255,255,.6);text-align:right}
+.alt-grid{display:flex;gap:8px;margin:0 20px 14px}
+.alt-card{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:13px 12px;display:flex;align-items:center;gap:9px;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.alt-emoji{font-size:24px}
+.alt-name{font-size:14px;font-weight:600;color:var(--text1)}
+
+/* mediation */
+.med-card{margin:0 20px 10px;border-radius:var(--r-lg);padding:16px;position:relative;overflow:hidden}
+.med-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+.med-card.blue{background:var(--blue-bg)}.med-card.blue::before{background:var(--blue)}
+.med-card.green{background:var(--green-bg)}.med-card.green::before{background:var(--green)}
+.med-card.orange{background:var(--orange-bg)}.med-card.orange::before{background:var(--orange)}
+.med-card-label{font-size:12px;font-weight:700;margin-bottom:7px;padding-left:10px}
+.med-card.blue .med-card-label{color:var(--blue)}
+.med-card.green .med-card-label{color:var(--green)}
+.med-card.orange .med-card-label{color:var(--orange)}
+.med-card-body{font-size:14px;line-height:1.6;color:var(--text1);padding-left:10px}
+.neutral-notice{text-align:center;font-size:12px;color:var(--text3);padding:8px 20px 16px}
+.lock-notice{margin:0 20px 14px;padding:12px 14px;background:var(--surface2);border-radius:var(--r-md);font-size:13px;color:var(--text2);line-height:1.5}
+
+/* history */
+.history-item{display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:0.5px solid var(--border2);cursor:pointer}
+.history-item:active{background:var(--surface2)}
+.history-icon{font-size:18px;flex-shrink:0}
+.history-info{flex:1;min-width:0}
+.history-title{font-size:14px;font-weight:500;color:var(--text1)}
+.history-date{font-size:12px;color:var(--text2);margin-top:2px}
+.chip-result{font-size:11px;font-weight:600;padding:4px 9px;border-radius:20px;flex-shrink:0}
+.chip-green{background:var(--green-bg);color:#1A7A35}
+.chip-blue{background:var(--blue-bg);color:#1A5FA5}
+.stat-row{display:flex;justify-content:space-around;text-align:center}
+.stat-item .stat-num{font-size:26px;font-weight:700}
+.stat-item .stat-label{font-size:12px;color:var(--text2);margin-top:2px}
+.stat-divider{width:0.5px;background:var(--border2)}
+
+/* setup */
+.setup-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;gap:24px;text-align:center}
+.setup-icon{font-size:56px}
+.setup-title{font-size:24px;font-weight:700;color:var(--text1);line-height:1.3}
+.setup-sub{font-size:14px;color:var(--text2);line-height:1.6}
+
+/* action cards */
+.action-cards-row{display:flex;gap:10px;margin:0 20px 10px}
+.action-card-btn{flex:1;cursor:pointer;border:none;border-radius:var(--r-xl);padding:20px 16px;text-align:left;font-family:var(--font);transition:opacity .15s}
+.action-card-btn:active{opacity:.88}
+.action-card-btn.decide{background:var(--primary)}
+.action-card-btn.mediate{background:#6B9EFA}
+.action-card-icon{font-size:30px;margin-bottom:10px;display:block}
+.action-card-title{font-size:17px;font-weight:700;color:#fff;margin-bottom:4px}
+.action-card-sub{font-size:12px;color:rgba(255,255,255,.82);line-height:1.4}
+
+/* room code */
+.code-display{background:var(--primary-light);border:2px dashed var(--primary-mid);border-radius:var(--r-xl);padding:24px 20px;text-align:center;margin:0 20px 14px}
+.code-label{font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;letter-spacing:.5px}
+.code-value{font-size:44px;font-weight:700;color:var(--primary);letter-spacing:8px;font-family:monospace}
+.code-copy-btn{margin-top:10px;font-size:13px;color:var(--primary);cursor:pointer;background:none;border:none;font-family:var(--font);font-weight:600}
+
+/* waiting */
+.waiting-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 28px;gap:18px;text-align:center}
+.waiting-icon{font-size:52px;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.waiting-title{font-size:20px;font-weight:700;color:var(--text1)}
+.waiting-sub{font-size:14px;color:var(--text2);line-height:1.6}
+.user-status-row{display:flex;gap:20px;background:var(--surface2);border-radius:var(--r-lg);padding:14px 24px}
+.user-status{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--text2);min-width:56px}
+.user-status.done{color:var(--green);font-weight:600}
+.status-dot{width:12px;height:12px;border-radius:50%;background:var(--border)}
+.user-status.done .status-dot{background:var(--green)}
+.status-sep{width:1px;background:var(--border2)}
+
+/* firebase setup */
+.step-item{display:flex;gap:14px;padding:10px 0;border-bottom:0.5px solid var(--border2)}
+.step-item:last-child{border-bottom:none}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-text{font-size:13px;color:var(--text1);line-height:1.55;flex:1}
+.step-text b{color:var(--primary)}
+.mono-block{background:var(--surface2);border-radius:var(--r-sm);padding:10px 12px;font-family:monospace;font-size:11px;color:var(--text2);word-break:break-all;line-height:1.5;margin-top:6px}
+
+/* settings */
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:0.5px solid var(--border2);background:var(--surface);cursor:pointer}
+.settings-row:active{background:var(--surface2)}
+.settings-label{font-size:15px;color:var(--text1)}
+.settings-value{font-size:13px;color:var(--text2)}
+.profile-row{display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:4px}
+.profile-avatar{width:54px;height:54px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.profile-name{font-size:17px;font-weight:600;color:var(--text1)}
+.profile-sub{font-size:12px;color:var(--text2);margin-top:3px;word-break:break-all}
+
+/* toast */
+.toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:rgba(28,28,30,.88);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;white-space:nowrap;opacity:0;transition:all .3s;pointer-events:none;z-index:100;max-width:350px;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ① FIREBASE 미설정 안내 -->
+<div class="screen" id="screen-firebase">
+  <div class="top-bar"><span class="logo">ouur</span></div>
+  <div class="scroll-area" style="padding:0 0 24px">
+    <div style="padding:16px 20px 12px">
+      <div style="font-size:21px;font-weight:700;color:var(--text1);margin-bottom:6px">Firebase 연결 필요</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.6">실시간 2인 동기화를 위해 Firebase를 설정해야 해요.<br>무료 요금제로 충분해요 (5분이면 끝나요).</div>
+    </div>
+    <div class="card">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <b>console.firebase.google.com</b> 접속 → "프로젝트 만들기"<br>
+          Google 계정으로 로그인 후 프로젝트 이름 입력 (Analytics 불필요)
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-text">
+          왼쪽 메뉴 → <b>빌드 → Realtime Database</b> → "데이터베이스 만들기"<br>
+          지역: us-central1 / 보안 규칙: <b>테스트 모드</b> 선택
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-text">
+          ⚙ 프로젝트 설정 → <b>내 앱</b> → 웹 앱 추가(&lt;/&gt;)<br>
+          앱 등록 후 나오는 <b>firebaseConfig 객체</b> 복사
+        </div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-text">
+          <b>ouur_app.html</b>을 텍스트 편집기로 열어서<br>
+          상단 <b>FIREBASE_CONFIG</b> 값을 복사한 내용으로 교체
+          <div class="mono-block">const FIREBASE_CONFIG = {<br>&nbsp;&nbsp;apiKey: "<span style="color:var(--primary)">← 여기부터 교체</span>",<br>&nbsp;&nbsp;authDomain: "...",<br>&nbsp;&nbsp;databaseURL: "https://...",<br>&nbsp;&nbsp;projectId: "..."<br>};</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ② API 키 설정 -->
+<div class="screen" id="screen-setup">
+  <div class="setup-wrap">
+    <div class="setup-icon">🔑</div>
+    <div class="setup-title">Claude API 키를<br>입력해주세요</div>
+    <div class="setup-sub">AI 분석에 사용해요. 이 기기에만 저장되고<br>외부로 전송되지 않아요.</div>
+    <div style="width:100%">
+      <input class="input-field" type="password" id="api-key-input" placeholder="sk-ant-..." style="margin-bottom:12px"/>
+      <button class="btn-primary" onclick="saveApiKey()">시작하기 →</button>
+    </div>
+    <div style="font-size:12px;color:var(--text3)">console.anthropic.com에서 발급받을 수 있어요</div>
+  </div>
+</div>
+
+<!-- ③ 홈 -->
+<div class="screen" id="screen-home">
+  <div class="top-bar">
+    <span class="logo">ouur</span>
+    <button class="top-action" onclick="show('screen-settings')">⚙</button>
+  </div>
+  <div class="scroll-area">
+    <div style="padding:8px 20px 16px">
+      <div style="font-size:21px;font-weight:700;color:var(--text1);margin-bottom:4px">안녕하세요 👋</div>
+      <div style="font-size:14px;color:var(--text2)">둘이 함께 결정하거나 갈등을 해결해보세요</div>
+    </div>
+    <div class="action-cards-row">
+      <button class="action-card-btn decide" onclick="startCreate('decision')">
+        <span class="action-card-icon">⚡</span>
+        <div class="action-card-title">결정하기</div>
+        <div class="action-card-sub">뭐 먹을지, 뭐 할지<br>같이 정해요</div>
+      </button>
+      <button class="action-card-btn mediate" onclick="startCreate('mediation')">
+        <span class="action-card-icon">🕊</span>
+        <div class="action-card-title">중재 요청</div>
+        <div class="action-card-sub">억울한데 싸우기는<br>싫을 때</div>
+      </button>
+    </div>
+    <div class="card card-shadow" style="cursor:pointer;display:flex;align-items:center;gap:14px" onclick="show('screen-join')">
+      <div style="width:44px;height:44px;border-radius:var(--r-md);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px">🔗</div>
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--text1)">코드로 참여</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">상대방이 만든 룸에 입장해요</div>
+      </div>
+      <div style="margin-left:auto;font-size:20px;color:var(--text3)">›</div>
+    </div>
+    <div class="section-header">최근 기록</div>
+    <div id="home-history-list"></div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-item active"><span class="nav-icon">🏠</span>홈</button>
+    <button class="nav-item" onclick="show('screen-history')"><span class="nav-icon">📋</span>히스토리</button>
+    <button class="nav-item" onclick="show('screen-settings')"><span class="nav-icon">⚙️</span>설정</button>
+  </div>
+</div>
+
+<!-- ④ 룸 만들기 -->
+<div class="screen" id="screen-create">
+  <div class="top-bar">
+    <button class="back-btn" onclick="show('screen-home')">←</button>
+    <span class="screen-title" id="create-title">결정하기</span>
+    <div style="width:28px"></div>
+  </div>
+  <div style="padding:8px 20px 14px">
+    <div style="font-size:21px;font-weight:700;color:var(--text1);margin-bottom:4px" id="create-heading">어떤 걸 결정할까요?</div>
+    <div style="font-size:13px;color:var(--text2)" id="create-sub">주제를 정하면 코드를 받아요</div>
+  </div>
+  <div id="create-decision-section">
+    <div class="input-group">
+      <div class="input-label">주제</div>
+      <input class="input-field" type="text" id="topic-input" placeholder="예: 오늘 저녁 메뉴" maxlength="50"/>
+    </div>
+    <div class="section-header" style="padding-top:4px">카테고리</div>
+    <div class="chip-row">
+      <button class="chip selected" onclick="selectChip(this,'cat')">🍽 메뉴</button>
+      <button class="chip" onclick="selectChip(this,'cat')">🎬 영화·콘텐츠</button>
+      <button class="chip" onclick="selectChip(this,'cat')">🗓 주말 계획</button>
+      <button class="chip" onclick="selectChip(this,'cat')">📦 기타</button>
+    </div>
+  </div>
+  <div id="create-mediation-section" style="display:none">
+    <div class="lock-notice">🔒 각자 다른 기기에서 입력해요. 상대방은 내 내용을 볼 수 없어요.</div>
+    <div class="input-group">
+      <div class="input-label">갈등 주제 (선택)</div>
+      <input class="input-field" type="text" id="mediate-topic-input" placeholder="예: 청소 분담" maxlength="40"/>
+    </div>
+  </div>
+  <div style="padding:0 20px;margin-top:auto;padding-bottom:24px">
+    <button class="btn-primary" onclick="createRoom()">룸 만들기 →</button>
+  </div>
+</div>
+
+<!-- ⑤ 로비 (코드 공유) -->
+<div class="screen" id="screen-lobby">
+  <div class="top-bar">
+    <button class="back-btn" onclick="leaveRoom()">✕</button>
+    <span class="screen-title" id="lobby-screen-title">룸 코드</span>
+    <div style="width:28px"></div>
+  </div>
+  <div class="scroll-area">
+    <div style="padding:8px 20px 12px">
+      <div style="font-size:21px;font-weight:700;color:var(--text1);margin-bottom:4px" id="lobby-heading">상대방에게 코드를 공유해요</div>
+      <div style="font-size:13px;color:var(--text2)" id="lobby-sub">상대방이 코드로 입장하면 각자 의견을 입력해요</div>
+    </div>
+    <div class="code-display">
+      <div class="code-label">ROOM CODE</div>
+      <div class="code-value" id="lobby-code">------</div>
+      <button class="code-copy-btn" onclick="copyCode()">📋 코드 복사</button>
+    </div>
+    <div class="card" style="background:var(--surface2);box-shadow:none">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">주제</div>
+      <div style="font-size:16px;font-weight:600;color:var(--text1)" id="lobby-topic">—</div>
+    </div>
+    <div style="padding:12px 20px 24px">
+      <button class="btn-primary" onclick="goToInput()">내 의견 입력하기 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⑥ 코드로 참여 -->
+<div class="screen" id="screen-join">
+  <div class="top-bar">
+    <button class="back-btn" onclick="show('screen-home')">←</button>
+    <span class="screen-title">코드로 참여</span>
+    <div style="width:28px"></div>
+  </div>
+  <div class="setup-wrap" style="gap:20px">
+    <div class="setup-icon">🔗</div>
+    <div class="setup-title" style="font-size:20px">룸 코드를 입력해요</div>
+    <div style="width:100%">
+      <input class="input-field" type="text" id="join-code-input" placeholder="예: ABK7M2" maxlength="6"
+        style="text-transform:uppercase;letter-spacing:5px;font-size:24px;text-align:center;font-weight:700;font-family:monospace;margin-bottom:12px"
+        oninput="this.value=this.value.toUpperCase()"/>
+      <button class="btn-primary" onclick="joinRoom()">입장하기 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⑦ 내 의견 입력 -->
+<div class="screen" id="screen-input">
+  <div class="top-bar">
+    <button class="back-btn" onclick="show('screen-lobby')">←</button>
+    <span class="screen-title" id="input-screen-title">내 의견</span>
+    <div style="width:28px"></div>
+  </div>
+  <div class="scroll-area" style="padding-bottom:90px">
+    <div style="padding:8px 20px 10px">
+      <div style="font-size:13px;color:var(--text2);padding:10px 12px;background:var(--surface2);border-radius:var(--r-md);line-height:1.5">👀 상대방은 결과 나오기 전까지 못 봐요. 솔직하게!</div>
+    </div>
+    <!-- 결정 필드 -->
+    <div id="input-decision-fields">
+      <div class="input-group" style="margin-top:6px">
+        <div class="input-label">원하는 것</div>
+        <textarea class="input-field" rows="2" id="want-input" placeholder="솔직하게 써도 돼요" maxlength="100"></textarea>
+      </div>
+      <div class="input-group">
+        <div class="input-label">원하지 않는 것</div>
+        <textarea class="input-field" rows="2" id="notwant-input" placeholder="이건 제발 빼줘요" maxlength="100"></textarea>
+      </div>
+      <div class="section-header" style="padding-top:4px">오늘 컨디션</div>
+      <div class="chip-row">
+        <button class="chip" onclick="selectChip(this,'mood')">😴 피곤</button>
+        <button class="chip selected" onclick="selectChip(this,'mood')">😊 보통</button>
+        <button class="chip" onclick="selectChip(this,'mood')">⚡ 텐션높음</button>
+      </div>
+    </div>
+    <!-- 중재 필드 -->
+    <div id="input-mediation-fields" style="display:none">
+      <div class="input-group" style="margin-top:6px">
+        <div class="input-label">상황 <span style="color:var(--primary)">*</span></div>
+        <textarea class="input-field" rows="3" id="med-situation" placeholder="어떤 일이 있었는지 설명해줘요" maxlength="200"></textarea>
+      </div>
+      <div class="input-group">
+        <div class="input-label">내 감정</div>
+        <textarea class="input-field" rows="2" id="med-feeling" placeholder="솔직한 감정을 써줘요" maxlength="100"></textarea>
+      </div>
+      <div class="input-group">
+        <div class="input-label">원하는 결과</div>
+        <textarea class="input-field" rows="2" id="med-want" placeholder="어떻게 됐으면 좋겠어요?" maxlength="100"></textarea>
+      </div>
+    </div>
+  </div>
+  <div style="padding:0 20px 24px;background:var(--bg);position:sticky;bottom:0;border-top:0.5px solid var(--border2)">
+    <button class="btn-primary" id="submit-btn" onclick="submitMyInput()" style="margin-top:12px">완료 — 상대방 기다리기 ✓</button>
+  </div>
+</div>
+
+<!-- ⑧ 대기 -->
+<div class="screen" id="screen-waiting">
+  <div class="top-bar">
+    <button class="back-btn" onclick="leaveRoom()">✕</button>
+    <span class="screen-title">기다리는 중</span>
+    <div style="width:28px"></div>
+  </div>
+  <div class="waiting-wrap">
+    <div class="waiting-icon">⏳</div>
+    <div class="waiting-title">상대방을 기다리고 있어요</div>
+    <div class="waiting-sub">상대방이 입력을 완료하면<br>AI가 바로 분석을 시작해요</div>
+    <div class="user-status-row">
+      <div class="user-status done" id="waiting-me">
+        <span class="status-dot"></span>
+        <span>나</span>
+        <span style="font-size:10px">완료 ✓</span>
+      </div>
+      <div class="status-sep"></div>
+      <div class="user-status" id="waiting-partner">
+        <span class="status-dot"></span>
+        <span>상대방</span>
+        <span style="font-size:10px" id="partner-status-text">입력 중...</span>
+      </div>
+    </div>
+    <div style="font-size:13px;color:var(--text3)">룸 코드: <b id="waiting-code-display" style="color:var(--primary);font-family:monospace;letter-spacing:3px"></b></div>
+  </div>
+</div>
+
+<!-- ⑨ 로딩 -->
+<div class="screen" id="screen-loading">
+  <div class="loading-wrap">
+    <div class="loading-icon-wrap">✨</div>
+    <div class="loading-title" id="loading-text">AI가 분석 중이에요</div>
+    <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    <div class="loading-sub">두 사람의 마음을 이해하고 있어요<br>잠시만 기다려 주세요 🌱</div>
+  </div>
+</div>
+
+<!-- ⑩ 결정 결과 -->
+<div class="screen" id="screen-result">
+  <div class="top-bar">
+    <button class="back-btn" onclick="finishSession()">✕</button>
+    <span class="screen-title">오늘의 결정 🎉</span>
+    <div style="width:28px"></div>
+  </div>
+  <div class="scroll-area">
+    <div class="result-main">
+      <div class="result-row">
+        <div class="result-emoji" id="result-emoji">🍲</div>
+        <div>
+          <div class="result-name" id="result-title">결과</div>
+          <div class="result-rank">AI 1순위 추천</div>
+        </div>
+      </div>
+      <div class="result-reason" id="result-reason"></div>
+      <div class="result-notice">AI도 네 편은 아니야 😇</div>
+    </div>
+    <div style="padding:0 20px 8px;font-size:13px;font-weight:600;color:var(--text2)">다른 선택지</div>
+    <div class="alt-grid" id="alt-grid"></div>
+    <div style="padding:0 20px 24px">
+      <button class="btn-primary" onclick="finishSession()">✅ 확인했어요</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⑪ 중재 결과 -->
+<div class="screen" id="screen-mediate-result">
+  <div class="top-bar">
+    <button class="back-btn" onclick="finishSession()">✕</button>
+    <span class="screen-title">중재 리포트 🕊</span>
+    <div style="width:28px"></div>
+  </div>
+  <div class="scroll-area" style="padding:12px 0 20px">
+    <div class="med-card blue">
+      <div class="med-card-label">내 입장</div>
+      <div class="med-card-body" id="my-summary">분석 중...</div>
+    </div>
+    <div class="med-card green">
+      <div class="med-card-label">상대방 입장</div>
+      <div class="med-card-body" id="other-summary">분석 중...</div>
+    </div>
+    <div class="med-card orange">
+      <div class="med-card-label">AI의 제안</div>
+      <div class="med-card-body" id="ai-suggestion">분석 중...</div>
+    </div>
+    <div class="neutral-notice">AI도 네 편은 아니야 😇</div>
+    <div style="padding:0 20px">
+      <button class="btn-primary" onclick="finishSession()">확인했어요 ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⑫ 히스토리 -->
+<div class="screen" id="screen-history">
+  <div class="top-bar">
+    <span class="logo">ouur</span>
+    <span style="font-size:13px;color:var(--text2)">이번 달</span>
+  </div>
+  <div class="scroll-area">
+    <div class="card card-shadow" style="margin-bottom:16px">
+      <div class="stat-row">
+        <div class="stat-item"><div class="stat-num" style="color:var(--primary)" id="stat-dec">0</div><div class="stat-label">결정</div></div>
+        <div class="stat-divider"></div>
+        <div class="stat-item"><div class="stat-num" style="color:var(--blue)" id="stat-med">0</div><div class="stat-label">중재</div></div>
+      </div>
+    </div>
+    <div class="section-header">전체 기록</div>
+    <div id="history-list"></div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="show('screen-home')"><span class="nav-icon">🏠</span>홈</button>
+    <button class="nav-item active"><span class="nav-icon">📋</span>히스토리</button>
+    <button class="nav-item" onclick="show('screen-settings')"><span class="nav-icon">⚙️</span>설정</button>
+  </div>
+</div>
+
+<!-- ⑬ 설정 -->
+<div class="screen" id="screen-settings">
+  <div class="top-bar">
+    <button class="back-btn" onclick="show('screen-home')">←</button>
+    <span class="screen-title">설정</span>
+    <div style="width:28px"></div>
+  </div>
+  <div class="scroll-area" style="padding-top:8px">
+    <div class="profile-row">
+      <div class="profile-avatar">🙂</div>
+      <div>
+        <div class="profile-name">나</div>
+        <div class="profile-sub" id="uid-display">—</div>
+      </div>
+    </div>
+    <div class="section-header">API 설정</div>
+    <div style="margin:0 20px 20px">
+      <div class="input-group" style="margin:0 0 10px">
+        <div class="input-label">Claude API 키</div>
+        <input class="input-field" type="password" id="settings-api-key" placeholder="sk-ant-..."/>
+      </div>
+      <button class="btn-primary" onclick="saveApiKeyFromSettings()">저장</button>
+    </div>
+    <div class="section-header">데이터</div>
+    <div style="margin:0 20px 20px">
+      <button class="btn-secondary" onclick="clearHistory()">기록 전체 삭제</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+</div><!-- #app -->
+
+<script>
+// ── FIREBASE CONFIG ─────────────────────────────────────────────
+// ⚠️ Firebase 콘솔에서 복사한 값으로 교체해주세요
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAnyYxfWz-Vp9EClochaupmkoeqVbp03lc",
+  authDomain: "ouur-d0cd3.firebaseapp.com",
+  databaseURL: "https://ouur-d0cd3-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ouur-d0cd3",
+  storageBucket: "ouur-d0cd3.firebasestorage.app",
+  messagingSenderId: "630114022807",
+  appId: "1:630114022807:web:7a47ccd767f5fc7b1ec0d2"
+};
+
+const FB_READY = !FIREBASE_CONFIG.apiKey.startsWith('REPLACE');
+let db = null;
+if (FB_READY) {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+  } catch(e) { console.error('Firebase init failed', e); }
+}
+
+// ── STATE ──────────────────────────────────────────────────────
+const myUID = (() => {
+  let uid = localStorage.getItem('ouur_uid');
+  if (!uid) { uid = 'u' + Date.now().toString(36) + Math.random().toString(36).substr(2,4); localStorage.setItem('ouur_uid', uid); }
+  return uid;
+})();
+
+let currentRoomCode = null;
+let currentRoomType = 'decision';
+let currentRoomTopic = '';
+let myRole = 'A';
+let selectedMood = '보통';
+let selectedCategory = '메뉴';
+let roomRef = null;
+let roomCb = null;
+let processingClaimed = false;
+
+// ── STORAGE ────────────────────────────────────────────────────
+const getHistory = () => JSON.parse(localStorage.getItem('ouur_history') || '[]');
+const saveHistory = h => localStorage.setItem('ouur_history', JSON.stringify(h));
+const getApiKey = () => localStorage.getItem('ouur_api_key') || '';
+const setApiKey = k => localStorage.setItem('ouur_api_key', k.trim());
+
+// ── NAVIGATION ─────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+  if (id === 'screen-history') renderHistory();
+  if (id === 'screen-home') renderHomeHistory();
+  if (id === 'screen-settings') {
+    document.getElementById('uid-display').textContent = myUID;
+    const k = getApiKey(); if (k) document.getElementById('settings-api-key').value = k;
+  }
+}
+
+// ── CHIP ───────────────────────────────────────────────────────
+function selectChip(el, group) {
+  el.closest('.chip-row').querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  if (group === 'mood') selectedMood = el.textContent.trim();
+  if (group === 'cat') selectedCategory = el.textContent.trim();
+}
+
+// ── API KEY ────────────────────────────────────────────────────
+function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key.startsWith('sk-ant-')) { toast('올바른 API 키를 입력해주세요'); return; }
+  setApiKey(key); show('screen-home'); renderHomeHistory();
+}
+function saveApiKeyFromSettings() {
+  const key = document.getElementById('settings-api-key').value.trim();
+  if (!key.startsWith('sk-ant-')) { toast('올바른 API 키를 입력해주세요'); return; }
+  setApiKey(key); toast('✅ API 키가 저장됐어요');
+}
+
+// ── ROOM CODE ──────────────────────────────────────────────────
+function genCode() {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:6}, () => c[Math.floor(Math.random()*c.length)]).join('');
+}
+
+// ── CREATE ─────────────────────────────────────────────────────
+function startCreate(type) {
+  if (!FB_READY) { show('screen-firebase'); return; }
+  if (!getApiKey()) { show('screen-setup'); return; }
+  currentRoomType = type;
+  if (type === 'decision') {
+    document.getElementById('create-title').textContent = '결정하기';
+    document.getElementById('create-heading').textContent = '어떤 걸 결정할까요?';
+    document.getElementById('create-sub').textContent = '주제를 정하면 코드를 받아요';
+    document.getElementById('create-decision-section').style.display = '';
+    document.getElementById('create-mediation-section').style.display = 'none';
+  } else {
+    document.getElementById('create-title').textContent = '중재 요청';
+    document.getElementById('create-heading').textContent = '중재 룸을 만들어요';
+    document.getElementById('create-sub').textContent = '코드를 공유하고 각자 입력해요';
+    document.getElementById('create-decision-section').style.display = 'none';
+    document.getElementById('create-mediation-section').style.display = '';
+  }
+  show('screen-create');
+}
+
+async function createRoom() {
+  let topic;
+  if (currentRoomType === 'decision') {
+    topic = document.getElementById('topic-input').value.trim();
+    if (!topic) { toast('주제를 입력해주세요'); return; }
+  } else {
+    topic = document.getElementById('mediate-topic-input').value.trim() || '중재';
+  }
+
+  const code = genCode();
+  try {
+    await db.ref(`rooms/${code}`).set({
+      type: currentRoomType, topic,
+      category: selectedCategory,
+      apiKey: getApiKey(),
+      createdAt: Date.now(),
+      status: 'open'
+    });
+    currentRoomCode = code;
+    currentRoomTopic = topic;
+    myRole = 'A';
+    processingClaimed = false;
+    setLobby(code, topic);
+    show('screen-lobby');
+  } catch(e) { toast('룸 생성 실패: ' + e.message); }
+}
+
+// ── JOIN ───────────────────────────────────────────────────────
+async function joinRoom() {
+  if (!FB_READY) { show('screen-firebase'); return; }
+  if (!getApiKey()) { show('screen-setup'); return; }
+  const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+  if (code.length !== 6) { toast('6자리 코드를 입력해주세요'); return; }
+  try {
+    const snap = await db.ref(`rooms/${code}`).get();
+    if (!snap.exists()) { toast('룸을 찾을 수 없어요'); return; }
+    const room = snap.val();
+    if (room.status === 'done') { toast('이미 완료된 룸이에요'); return; }
+    const users = room.users || {};
+    const ids = Object.keys(users);
+    if (ids.length >= 2 && !ids.includes(myUID)) { toast('이미 2명이 참여한 룸이에요'); return; }
+    currentRoomCode = code;
+    currentRoomType = room.type;
+    currentRoomTopic = room.topic;
+    myRole = 'B';
+    processingClaimed = false;
+    document.getElementById('join-code-input').value = '';
+    setLobby(code, room.topic, true);
+    show('screen-lobby');
+  } catch(e) { toast('입장 실패: ' + e.message); }
+}
+
+function setLobby(code, topic, isJoiner) {
+  document.getElementById('lobby-code').textContent = code;
+  document.getElementById('lobby-topic').textContent = topic;
+  document.getElementById('lobby-screen-title').textContent = currentRoomType === 'decision' ? '결정하기' : '중재 요청';
+  if (isJoiner) {
+    document.getElementById('lobby-heading').textContent = `"${topic}" 룸에 참여해요`;
+    document.getElementById('lobby-sub').textContent = '아래 버튼을 눌러 내 의견을 입력해요';
+  } else {
+    document.getElementById('lobby-heading').textContent = '상대방에게 코드를 공유해요';
+    document.getElementById('lobby-sub').textContent = '상대방이 코드로 입장하면 각자 의견을 입력해요';
+  }
+}
+
+// ── INPUT ──────────────────────────────────────────────────────
+function goToInput() {
+  if (currentRoomType === 'decision') {
+    document.getElementById('input-screen-title').textContent = '내 의견';
+    document.getElementById('input-decision-fields').style.display = '';
+    document.getElementById('input-mediation-fields').style.display = 'none';
+  } else {
+    document.getElementById('input-screen-title').textContent = '내 상황';
+    document.getElementById('input-decision-fields').style.display = 'none';
+    document.getElementById('input-mediation-fields').style.display = '';
+  }
+  show('screen-input');
+}
+
+async function submitMyInput() {
+  if (!currentRoomCode) { toast('오류: 룸 코드 없음'); return; }
+  let userData = { role: myRole, done: true };
+
+  if (currentRoomType === 'decision') {
+    const want = document.getElementById('want-input').value.trim();
+    if (!want) { toast('원하는 것을 입력해주세요'); return; }
+    userData = { ...userData, want, notwant: document.getElementById('notwant-input').value.trim(), mood: selectedMood };
+  } else {
+    const situation = document.getElementById('med-situation').value.trim();
+    if (!situation) { toast('상황을 입력해주세요'); return; }
+    userData = { ...userData, situation, feeling: document.getElementById('med-feeling').value.trim(), want: document.getElementById('med-want').value.trim() };
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = '저장 중...';
+
+  try {
+    await db.ref(`rooms/${currentRoomCode}/users/${myUID}`).set(userData);
+    const snap = await db.ref(`rooms/${currentRoomCode}/users`).get();
+    const users = Object.values(snap.val() || {});
+    const allDone = users.filter(u => u.done).length >= 2;
+
+    if (allDone) {
+      tryProcess();
+    } else {
+      document.getElementById('waiting-code-display').textContent = currentRoomCode;
+      show('screen-waiting');
+      startWatcher();
+    }
+  } catch(e) {
+    toast('저장 실패: ' + e.message);
+    btn.disabled = false; btn.textContent = '완료 — 상대방 기다리기 ✓';
+  }
+}
+
+// ── WATCHER ────────────────────────────────────────────────────
+function startWatcher() {
+  stopWatcher();
+  roomRef = db.ref(`rooms/${currentRoomCode}`);
+  roomCb = roomRef.on('value', snap => {
+    const room = snap.val();
+    if (!room) return;
+
+    // Update partner status in waiting UI
+    const users = room.users || {};
+    const partnerDone = Object.entries(users).some(([uid, u]) => uid !== myUID && u.done);
+    if (partnerDone) {
+      document.getElementById('waiting-partner').classList.add('done');
+      document.getElementById('partner-status-text').textContent = '완료 ✓';
+    }
+
+    // Both done → try to process
+    const doneCount = Object.values(users).filter(u => u.done).length;
+    if (doneCount >= 2 && !processingClaimed && room.status !== 'done') {
+      tryProcess();
+    }
+
+    // Result ready
+    if (room.status === 'done' && room.result) {
+      stopWatcher();
+      renderResult(room.result);
+    }
+  });
+}
+
+function stopWatcher() {
+  if (roomRef && roomCb) { roomRef.off('value', roomCb); roomRef = null; roomCb = null; }
+}
+
+// ── PROCESS (race-safe) ────────────────────────────────────────
+function tryProcess() {
+  if (!currentRoomCode) return;
+  db.ref(`rooms/${currentRoomCode}/processing`).transaction(cur => {
+    if (cur === null) return true;
+    return undefined; // abort
+  }, (err, committed) => {
+    if (err) return;
+    if (committed) {
+      processingClaimed = true;
+      stopWatcher();
+      runAI();
+    } else {
+      // Someone else processing — just watch for result
+      if (!roomCb) startWatcher();
+    }
+  });
+}
+
+// ── RUN AI ─────────────────────────────────────────────────────
+async function runAI() {
+  show('screen-loading');
+  const msgs = currentRoomType === 'decision'
+    ? ['양쪽 의견 분석 중...','공통점 찾는 중...','최적 답 고르는 중...']
+    : ['양측 입장 파악 중...','공감 포인트 찾는 중...','제안 다듬는 중...'];
+  let mi = 0;
+  const ticker = setInterval(() => { document.getElementById('loading-text').textContent = msgs[mi=(mi+1)%msgs.length]; }, 1400);
+
+  try {
+    const snap = await db.ref(`rooms/${currentRoomCode}`).get();
+    const room = snap.val();
+    const users = Object.values(room.users || {}).sort((a,b) => (a.role||'A').localeCompare(b.role||'A'));
+    const apiKey = room.apiKey || getApiKey();
+
+    const result = currentRoomType === 'decision'
+      ? await callDecide(room.topic, room.category, users, apiKey)
+      : await callMediate(users, apiKey);
+
+    clearInterval(ticker);
+    await db.ref(`rooms/${currentRoomCode}`).update({ status: 'done', result });
+    addToHistory(room.type, room.topic, result);
+    renderResult(result);
+  } catch(e) {
+    clearInterval(ticker);
+    const fallback = currentRoomType === 'decision'
+      ? { emoji:'🍲', result:'부대찌개', reason:'둘 다 좋아할 것 같은 안전한 선택이에요!', alternatives:[{emoji:'🥗',name:'샐러드'},{emoji:'🍕',name:'피자'}] }
+      : { summary_A:'억울한 마음이 충분히 이해돼요.', summary_B:'상대방도 나름의 사정이 있을 수 있어요.', suggestion:'"나 이 부분이 좀 힘들었어" 라고 편하게 시작해보세요. 비난 없이 내 감정을 먼저 꺼내는 게 포인트예요.' };
+    try { await db.ref(`rooms/${currentRoomCode}`).update({ status: 'done', result: fallback }); } catch(_) {}
+    renderResult(fallback);
+  }
+}
+
+// ── CLAUDE ─────────────────────────────────────────────────────
+async function callClaude(system, user, tokens, key) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:tokens, system, messages:[{role:'user',content:user}] })
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  const data = await res.json();
+  return JSON.parse(data.content[0].text.replace(/```json|```/g,'').trim());
+}
+
+async function callDecide(topic, category, users, key) {
+  const SYS = `두 사람의 의사결정을 돕는 따뜻하고 유머러스한 AI입니다. 절대 한쪽 편을 들지 않습니다. JSON만 반환:
+{"emoji":"이모지","result":"결정 결과 2-5자","reason":"이유 1-2문장 따뜻하게","alternatives":[{"emoji":"이모지","name":"대안1"},{"emoji":"이모지","name":"대안2"}]}`;
+  const parts = users.map((u,i) => `사용자${i+1}: 원함:${u.want||'미입력'} / 싫음:${u.notwant||'없음'} / 컨디션:${u.mood||'보통'}`).join('\n');
+  return callClaude(SYS, `주제:${topic}(${category||''})\n${parts}`, 600, key);
+}
+
+async function callMediate(users, key) {
+  const SYS = `두 사람 사이 갈등을 중립적으로 중재하는 따뜻한 AI입니다. JSON만 반환:
+{"summary_A":"사용자A 입장 공감 요약","summary_B":"사용자B 입장 공감 요약","suggestion":"두 사람을 위한 구체적 제안 2-3문장"}`;
+  const parts = users.map((u,i) => `사용자${String.fromCharCode(65+i)}: 상황:${u.situation||'미입력'} / 감정:${u.feeling||''} / 원하는결과:${u.want||''}`).join('\n');
+  return callClaude(SYS, parts, 800, key);
+}
+
+// ── RENDER RESULT ──────────────────────────────────────────────
+function renderResult(result) {
+  if (currentRoomType === 'decision') {
+    document.getElementById('result-emoji').textContent = result.emoji || '🎉';
+    document.getElementById('result-title').textContent = result.result || '결과';
+    document.getElementById('result-reason').textContent = result.reason || '';
+    document.getElementById('alt-grid').innerHTML = (result.alternatives||[]).map(a =>
+      `<div class="alt-card"><span class="alt-emoji">${a.emoji||'✨'}</span><span class="alt-name">${a.name||a}</span></div>`
+    ).join('');
+    show('screen-result');
+  } else {
+    const mk = myRole === 'A' ? 'summary_A' : 'summary_B';
+    const ok = myRole === 'A' ? 'summary_B' : 'summary_A';
+    document.getElementById('my-summary').textContent    = result[mk] || result.my_summary || '';
+    document.getElementById('other-summary').textContent = result[ok] || result.other_summary || '';
+    document.getElementById('ai-suggestion').textContent = result.suggestion || '';
+    show('screen-mediate-result');
+  }
+}
+
+// ── SESSION ─────────────────────────────────────────────────────
+function leaveRoom() { stopWatcher(); currentRoomCode = null; show('screen-home'); }
+function finishSession() { stopWatcher(); currentRoomCode = null; show('screen-home'); renderHomeHistory(); }
+
+// ── HISTORY ────────────────────────────────────────────────────
+function addToHistory(type, title, result) {
+  const h = getHistory();
+  h.unshift({ id:Date.now(), type, title, result: type==='decision' ? result.result : '중재 완료', emoji: type==='decision' ? result.emoji : '🕊', date: new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric'}) });
+  saveHistory(h);
+}
+
+function renderHomeHistory() {
+  const h = getHistory().slice(0,3);
+  const el = document.getElementById('home-history-list');
+  if (!h.length) { el.innerHTML = '<div style="padding:16px 20px 8px;text-align:center;color:var(--text3);font-size:14px">아직 기록이 없어요</div>'; return; }
+  el.innerHTML = h.map(item => `
+    <div class="history-item">
+      <span class="history-icon">${item.emoji||'⚡'}</span>
+      <div class="history-info"><div class="history-title">${item.title}</div><div class="history-date">${item.date}${item.result?' · '+item.result:''}</div></div>
+      <span class="chip-result ${item.type==='decision'?'chip-green':'chip-blue'}">${item.type==='decision'?'결정됨':'중재완료'}</span>
+    </div>`).join('');
+}
+
+function renderHistory() {
+  const h = getHistory();
+  document.getElementById('stat-dec').textContent = h.filter(x=>x.type==='decision').length;
+  document.getElementById('stat-med').textContent = h.filter(x=>x.type==='mediation').length;
+  const el = document.getElementById('history-list');
+  if (!h.length) { el.innerHTML = '<div style="padding:32px 20px;text-align:center;color:var(--text3);font-size:14px">아직 기록이 없어요</div>'; return; }
+  el.innerHTML = h.map(item => `
+    <div class="history-item">
+      <span class="history-icon">${item.emoji||'⚡'}</span>
+      <div class="history-info"><div class="history-title">${item.title}</div><div class="history-date">${item.date}${item.result?' · '+item.result:''}</div></div>
+      <span class="chip-result ${item.type==='decision'?'chip-green':'chip-blue'}">${item.type==='decision'?'결정됨':'중재완료'}</span>
+    </div>`).join('');
+}
+
+function clearHistory() {
+  if (!confirm('모든 기록을 삭제할까요?')) return;
+  saveHistory([]); renderHistory(); renderHomeHistory(); toast('기록이 삭제됐어요');
+}
+
+// ── COPY CODE ──────────────────────────────────────────────────
+function copyCode() {
+  const code = document.getElementById('lobby-code').textContent;
+  navigator.clipboard.writeText(code).then(() => toast('코드가 복사됐어요!')).catch(() => toast('코드: ' + code));
+}
+
+// ── TOAST ──────────────────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ── INIT ───────────────────────────────────────────────────────
+(function init() {
+  if (!FB_READY) { show('screen-firebase'); return; }
+  if (!getApiKey()) { show('screen-setup'); return; }
+  show('screen-home'); renderHomeHistory();
+})();
+</script>
+</body>
+</html>
