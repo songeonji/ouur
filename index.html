@@ -609,7 +609,7 @@ async function saveHistory(h) {
 }
 const getApiKey = () => cachedApiKey || '';
 async function loadApiKey() {
-  const snap = await db.ref('config/apiKey').get();
+  const snap = await db.ref('apikey/apiKey').get();
   cachedApiKey = snap.val() || '';
   return cachedApiKey;
 }
@@ -871,6 +871,8 @@ async function runAI() {
     renderResult(result);
   } catch(e) {
     clearInterval(ticker);
+    console.error('AI 오류:', e);
+    toast('AI 오류: ' + e.message);
     const fallback = currentRoomType === 'decision'
       ? { emoji:'🍲', result:'부대찌개', reason:'둘 다 좋아할 것 같은 안전한 선택이에요!', alternatives:[{emoji:'🥗',name:'샐러드'},{emoji:'🍕',name:'피자'}] }
       : { summary_A:'억울한 마음이 충분히 이해돼요.', summary_B:'상대방도 나름의 사정이 있을 수 있어요.', suggestion:'"나 이 부분이 좀 힘들었어" 라고 편하게 시작해보세요. 비난 없이 내 감정을 먼저 꺼내는 게 포인트예요.' };
