@@ -774,6 +774,8 @@ async function submitMyInput() {
 
   try {
     await db.ref(`rooms/${currentRoomCode}/users/${myUID}`).set(userData);
+    // 입력 완료 즉시 히스토리에 '대기중'으로 저장
+    await addToHistory(currentRoomType, currentRoomTopic, currentRoomCode);
     const snap = await db.ref(`rooms/${currentRoomCode}/users`).get();
     const users = Object.values(snap.val() || {});
     const allDone = users.filter(u => u.done).length >= 2;
@@ -865,7 +867,7 @@ async function runAI() {
 
     clearInterval(ticker);
     await db.ref(`rooms/${currentRoomCode}`).update({ status: 'done', result });
-    addToHistory(room.type, room.topic, result);
+    await completeHistory(currentRoomCode, result, room.type);
     renderResult(result);
   } catch(e) {
     clearInterval(ticker);
@@ -928,9 +930,22 @@ function leaveRoom() { stopWatcher(); currentRoomCode = null; show('screen-home'
 function finishSession() { stopWatcher(); currentRoomCode = null; show('screen-home'); renderHomeHistory(); }
 
 // ── HISTORY ────────────────────────────────────────────────────
-async function addToHistory(type, title, result) {
+async function addToHistory(type, title, roomCode) {
   const h = await getHistory();
-  h.unshift({ id:Date.now(), type, title, result: type==='decision' ? result.result : '중재 완료', emoji: type==='decision' ? result.emoji : '🕊', date: new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric'}) });
+  // 이미 이 룸 기록이 있으면 스킵 (중복 방지)
+  if (h.find(x => x.roomCode === roomCode)) return;
+  h.unshift({ id: Date.now(), type, title, roomCode, result: null, emoji: type==='decision' ? '⚡' : '🕊', date: new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric'}), status: 'waiting' });
+  await saveHistory(h);
+}
+
+async function completeHistory(roomCode, result, type) {
+  const h = await getHistory();
+  const item = h.find(x => x.roomCode === roomCode);
+  if (item) {
+    item.status = 'done';
+    item.result = type === 'decision' ? result.result : '중재 완료';
+    item.emoji = type === 'decision' ? result.emoji : '🕊';
+  }
   await saveHistory(h);
 }
 
@@ -938,12 +953,22 @@ async function renderHomeHistory() {
   const h = (await getHistory()).slice(0,3);
   const el = document.getElementById('home-history-list');
   if (!h.length) { el.innerHTML = '<div style="padding:16px 20px 8px;text-align:center;color:var(--text3);font-size:14px">아직 기록이 없어요</div>'; return; }
-  el.innerHTML = h.map(item => `
+  el.innerHTML = h.map(item => historyItemHTML(item)).join('');
+}
+
+function historyItemHTML(item) {
+  const statusBadge = item.status === 'waiting'
+    ? `<span class="chip-result" style="background:var(--orange-bg);color:var(--orange)">대기중</span>`
+    : `<span class="chip-result ${item.type==='decision'?'chip-green':'chip-blue'}">${item.type==='decision'?'결정됨':'중재완료'}</span>`;
+  return `
     <div class="history-item">
       <span class="history-icon">${item.emoji||'⚡'}</span>
-      <div class="history-info"><div class="history-title">${item.title}</div><div class="history-date">${item.date}${item.result?' · '+item.result:''}</div></div>
-      <span class="chip-result ${item.type==='decision'?'chip-green':'chip-blue'}">${item.type==='decision'?'결정됨':'중재완료'}</span>
-    </div>`).join('');
+      <div class="history-info">
+        <div class="history-title">${item.title}</div>
+        <div class="history-date">${item.date}${item.result?' · '+item.result:''}</div>
+      </div>
+      ${statusBadge}
+    </div>`;
 }
 
 async function renderHistory() {
@@ -952,12 +977,7 @@ async function renderHistory() {
   document.getElementById('stat-med').textContent = h.filter(x=>x.type==='mediation').length;
   const el = document.getElementById('history-list');
   if (!h.length) { el.innerHTML = '<div style="padding:32px 20px;text-align:center;color:var(--text3);font-size:14px">아직 기록이 없어요</div>'; return; }
-  el.innerHTML = h.map(item => `
-    <div class="history-item">
-      <span class="history-icon">${item.emoji||'⚡'}</span>
-      <div class="history-info"><div class="history-title">${item.title}</div><div class="history-date">${item.date}${item.result?' · '+item.result:''}</div></div>
-      <span class="chip-result ${item.type==='decision'?'chip-green':'chip-blue'}">${item.type==='decision'?'결정됨':'중재완료'}</span>
-    </div>`).join('');
+  el.innerHTML = h.map(item => historyItemHTML(item)).join('');
 }
 
 async function clearHistory() {
